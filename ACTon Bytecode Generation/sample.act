@@ -1,0 +1,121 @@
+actor BufferManager(4) {
+	knownactors {
+		Producer producer;
+		Consumer consumer;
+	}
+
+	actorvars {
+		boolean empty;
+		boolean full;
+		boolean producerWaiting;
+		boolean consumerWaiting;
+		int bufferlenght;
+		int nextProduce;
+		int nextConsume;
+	}
+
+	msghandler initial() {
+		bufferlenght = 2;
+		empty = true;
+		full = false;
+		producerWaiting = false;
+		consumerWaiting = false;
+		nextProduce = 0;
+		nextConsume = 0;
+	}
+
+	msghandler giveMeNextProduce() {
+		if (!full)	{
+			producer.produce();
+		}
+     	else {
+			producerWaiting = true;
+		}
+	}
+
+	msghandler giveMeNextConsume() {
+		if (!empty) {
+			consumer.consume();
+		}
+     		else {
+			consumerWaiting = true;
+		}
+	}
+
+	msghandler ackProduce() {
+		nextProduce = (nextProduce + 1) % bufferlenght;
+		if (nextProduce == nextConsume) {
+			full = true;
+		}
+		empty = false;
+		if (consumerWaiting) {
+			consumer.consume();
+			consumerWaiting = false;
+		}
+	}
+
+	msghandler ackConsume() {
+		nextConsume = (nextConsume + 1) % bufferlenght;
+		if (nextConsume == nextProduce) {
+			empty = true;
+		}
+		full = false;
+		if (producerWaiting) {
+			producer.produce();
+			producerWaiting = false;
+		}
+	}
+}
+
+actor Producer(2) {
+	knownactors {
+		BufferManager buffer;
+	}
+
+	actorvars {
+	}
+
+	msghandler initial() {
+		self.beginProduce();
+	}
+
+	msghandler produce() {
+		print("producer is producing");
+		buffer.ackProduce();
+		self.beginProduce();
+	}
+
+	msghandler beginProduce() {
+		buffer.giveMeNextProduce();
+	}
+}
+
+actor Consumer(2) {
+	knownactors {
+		BufferManager buffer;
+	}
+
+	actorvars {
+	}
+
+	msghandler initial() {
+		self.beginConsume();
+	}
+
+	msghandler consume() {
+		print("consumer is consuming");
+		buffer.ackConsume();
+		self.beginConsume();
+	}
+
+	msghandler beginConsume() {
+		buffer.giveMeNextConsume();
+	}
+
+}
+
+main {
+	BufferManager buffer(producer, consumer):();
+	Producer producer(buffer):();
+	Consumer consumer(buffer):();
+}
